@@ -5,9 +5,6 @@ import asyncio
 import edge_tts
 from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips
 from supabase import create_client
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-from google.oauth2.credentials import Credentials
 
 # Configuración de la página
 st.set_page_config(
@@ -15,7 +12,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Estilos CSS avanzados con diseño SaaS y corrección de legibilidad en botones
+# Estilos CSS avanzados con diseño SaaS y corrección de legibilidad
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -134,12 +131,9 @@ SVG_SPINNER = '<svg class="icon-inline" style="animation: spin 1.5s linear infin
 PIXABAY_KEY = st.secrets.get("PIXABAY_KEY", st.session_state.get('PIXABAY_KEY', ''))
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", st.session_state.get('SUPABASE_URL', ''))
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", st.session_state.get('SUPABASE_KEY', ''))
-YT_CLIENT_ID = st.secrets.get("YT_CLIENT_ID", st.session_state.get('YT_CLIENT_ID', ''))
-YT_CLIENT_SECRET = st.secrets.get("YT_CLIENT_SECRET", st.session_state.get('YT_CLIENT_SECRET', ''))
-YT_REFRESH_TOKEN = st.secrets.get("YT_REFRESH_TOKEN", st.session_state.get('YT_REFRESH_TOKEN', ''))
 
 st.markdown(f'<div class="header-title">{SVG_ZAP} Shorts Studio</div>', unsafe_allow_html=True)
-st.markdown('<div class="header-subtitle">Pipeline automatizado para generación y publicación de YouTube Shorts.</div>', unsafe_allow_html=True)
+st.markdown('<div class="header-subtitle">Pipeline automatizado para generación de YouTube Shorts.</div>', unsafe_allow_html=True)
 
 tab_app, tab_config = st.tabs(["Generador", "Configuración"])
 
@@ -174,11 +168,11 @@ with tab_app:
     
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
     
-    if st.button("Ejecutar Pipeline Cloud y Publicar"):
+    if st.button("Ejecutar Pipeline y Generar Vídeo"):
         if not guion:
             st.warning("Por favor, introduce un guion antes de comenzar.")
         elif not PIXABAY_KEY or not SUPABASE_URL:
-            st.error("Faltan credenciales esenciales de Pixabay o Supabase.")
+            st.error("Faltan credenciales esenciales de Pixabay o Supabase en la configuración.")
         else:
             status_placeholder = st.empty()
             progress_bar = st.progress(0)
@@ -186,7 +180,7 @@ with tab_app:
             try:
                 # 1. Edge-TTS
                 status_placeholder.markdown(f'<div class="status-box">{SVG_SPINNER} Sintetizando voz en off (Edge-TTS)...</div>', unsafe_allow_html=True)
-                progress_bar.progress(15)
+                progress_bar.progress(20)
                 async def make_audio():
                     communicate = edge_tts.Communicate(guion, "es-ES-AlvaroNeural")
                     await communicate.save("audio.mp3")
@@ -194,7 +188,7 @@ with tab_app:
                 
                 # 2. Pixabay API
                 status_placeholder.markdown(f'<div class="status-box">{SVG_SPINNER} Descargando clips B-roll desde Pixabay...</div>', unsafe_allow_html=True)
-                progress_bar.progress(35)
+                progress_bar.progress(40)
                 pixabay_url = f"https://pixabay.com/api/videos/?key={PIXABAY_KEY}&q={busqueda_broll}&orientation=vertical&per_page=3"
                 res = requests.get(pixabay_url).json()
                 
@@ -209,8 +203,8 @@ with tab_app:
                     video_files.append(VideoFileClip(v_path).subclip(0, 5))
                 
                 # 3. Composición con MoviePy
-                status_placeholder.markdown(f'<div class="status-box">{SVG_SPINNER} Renderizando vídeo final...</div>', unsafe_allow_html=True)
-                progress_bar.progress(55)
+                status_placeholder.markdown(f'<div class="status-box">{SVG_SPINNER} Renderizando vídeo final con MoviePy...</div>', unsafe_allow_html=True)
+                progress_bar.progress(65)
                 audio_clip = AudioFileClip("audio.mp3")
                 final_clip = concatenate_videoclips(video_files, method="compose").set_duration(audio_clip.duration)
                 final_clip = final_clip.set_audio(audio_clip)
@@ -218,63 +212,41 @@ with tab_app:
                 
                 # 4. Supabase Storage (Respaldo en la nube)
                 status_placeholder.markdown(f'<div class="status-box">{SVG_SPINNER} Subiendo recurso a Supabase Storage...</div>', unsafe_allow_html=True)
-                progress_bar.progress(75)
+                progress_bar.progress(85)
                 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
                 with open("output.mp4", "rb") as f:
-                    supabase.storage.from_("videos").upload("short_temp.mp4", f)
+                    supabase.storage.from_("videos").upload("short_temp.mp4", f, file_options={"upsert": "true"})
                 
-                # 5. Publicación en YouTube Shorts via API
-                status_placeholder.markdown(f'<div class="status-box">{SVG_SPINNER} Publicando Short en YouTube...</div>', unsafe_allow_html=True)
-                progress_bar.progress(90)
+                # 5. Guardar en session_state para lectura y descarga web
+                with open("output.mp4", "rb") as f:
+                    st.session_state['video_bytes'] = f.read()
+                st.session_state['video_ready'] = True
                 
-                if YT_CLIENT_ID and YT_CLIENT_SECRET and YT_REFRESH_TOKEN:
-                    creds = Credentials(
-                        None,
-                        refresh_token=YT_REFRESH_TOKEN,
-                        client_id=YT_CLIENT_ID,
-                        client_secret=YT_CLIENT_SECRET,
-                        token_uri="https://oauth2.googleapis.com/token"
-                    )
-                    youtube = build("youtube", "v3", credentials=creds)
-                    
-                    body = {
-                        "snippet": {
-                            "title": titulo_short,
-                            "description": f"{guion}\n\n#Shorts #Tech",
-                            "tags": ["shorts", "tecnologia"],
-                            "categoryId": "28"
-                        },
-                        "status": {
-                            "privacyStatus": "public",
-                            "selfDeclaredMadeForKids": False
-                        }
-                    }
-                    
-                    media = MediaFileUpload("output.mp4", chunksize=-1, resumable=True)
-                    request = youtube.videos().insert(
-                        part="snippet,status",
-                        body=body,
-                        media_body=media
-                    )
-                    response = request.execute()
-                
-                # 6. Purga de archivos temporales
-                progress_bar.progress(98)
-                supabase.storage.from_("videos").remove(["short_temp.mp4"])
+                # 6. Purga de archivos temporales locales
                 progress_bar.progress(100)
                 status_placeholder.empty()
                 
                 if os.path.exists("audio.mp3"): os.remove("audio.mp3")
-                if os.path.exists("output.mp4"): os.remove("output.mp4")
                 for i in range(len(video_files)):
                     if os.path.exists(f"clip_{i}.mp4"): os.remove(f"clip_{i}.mp4")
                     
-                st.success("✨ ¡Pipeline ejecutado y vídeo publicado con éxito en YouTube Shorts!")
+                st.success("✨ ¡Vídeo generado con éxito en la nube!")
                 
             except Exception as e:
                 progress_bar.empty()
                 status_placeholder.empty()
                 st.error(f"Error crítico en el pipeline: {e}")
+                
+    # Mostrar el botón de descarga si el vídeo está listo en la sesión
+    if st.session_state.get('video_ready', False):
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        st.markdown("### Descargar Resultado")
+        st.download_button(
+            label="📥 Descargar Short MP4",
+            data=st.session_state['video_bytes'],
+            file_name="youtube_short.mp4",
+            mime="video/mp4"
+        )
                 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -282,14 +254,11 @@ with tab_app:
 with tab_config:
     st.markdown('<div class="studio-card">', unsafe_allow_html=True)
     st.markdown(f'<h3 style="font-size:1.15rem; color:#0f172a; margin-bottom:0.5rem; display:flex; align-items:center;">{SVG_SHIELD} Credenciales de API</h3>', unsafe_allow_html=True)
-    st.markdown("<p style='color: #64748b; font-size: 0.9rem; margin-bottom:1.5rem;'>Configura las claves de Pixabay, Supabase y YouTube.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #64748b; font-size: 0.9rem; margin-bottom:1.5rem;'>Configura las claves esenciales de Pixabay y Supabase.</p>", unsafe_allow_html=True)
     
     pixabay_key_input = st.text_input("Pixabay API Key", type="password", value=PIXABAY_KEY)
     supabase_url_input = st.text_input("Supabase Project URL", value=SUPABASE_URL)
     supabase_key_input = st.text_input("Supabase Service Key", type="password", value=SUPABASE_KEY)
-    yt_client_id_input = st.text_input("YouTube Client ID", value=YT_CLIENT_ID)
-    yt_client_secret_input = st.text_input("YouTube Client Secret", type="password", value=YT_CLIENT_SECRET)
-    yt_refresh_token_input = st.text_input("YouTube Refresh Token", type="password", value=YT_REFRESH_TOKEN)
     
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
     
@@ -297,9 +266,6 @@ with tab_config:
         st.session_state['PIXABAY_KEY'] = pixabay_key_input
         st.session_state['SUPABASE_URL'] = supabase_url_input
         st.session_state['SUPABASE_KEY'] = supabase_key_input
-        st.session_state['YT_CLIENT_ID'] = yt_client_id_input
-        st.session_state['YT_CLIENT_SECRET'] = yt_client_secret_input
-        st.session_state['YT_REFRESH_TOKEN'] = yt_refresh_token_input
         st.success("¡Ajustes guardados correctamente en la sesión!")
         
     st.markdown('</div>', unsafe_allow_html=True)
