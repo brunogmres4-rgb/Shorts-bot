@@ -15,7 +15,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Estilos CSS avanzados con diseño SaaS y corrección de colores de texto
+# Estilos CSS avanzados con diseño SaaS y corrección de legibilidad en botones
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -28,7 +28,7 @@ st.markdown("""
         background-color: #f8fafc;
     }
     
-    /* Forzar que todos los textos, títulos y etiquetas sean oscuros y legibles */
+    /* Textos y títulos generales oscuros */
     h1, h2, h3, h4, h5, h6, span, label, .stMarkdown, p {
         color: #0f172a !important;
     }
@@ -68,21 +68,25 @@ st.markdown("""
         margin-bottom: 2.5rem;
     }
 
+    /* BOTONES: Fondo oscuro y texto BLANCO OBLIGATORIO */
     .stButton>button {
         width: 100%;
-        background-color: #0f172a;
+        background-color: #0f172a !important;
         color: #ffffff !important;
-        border: 1px solid #0f172a;
+        border: 1px solid #0f172a !important;
         border-radius: 10px;
         padding: 0.8rem 1rem;
         font-weight: 600;
         font-size: 0.95rem;
-        transition: all 0.2s ease-in-out;
+    }
+
+    .stButton>button *, .stButton>button p, .stButton>button span {
+        color: #ffffff !important;
     }
 
     .stButton>button:hover {
-        background-color: #1e293b;
-        border-color: #1e293b;
+        background-color: #1e293b !important;
+        border-color: #1e293b !important;
         box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
     }
 
