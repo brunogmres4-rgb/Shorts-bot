@@ -200,14 +200,28 @@ with tab_app:
                     await communicate.save("audio.mp3")
                 asyncio.run(make_audio())
                 
-                # 2. Pixabay API
+                # 2. Pixabay API (Blindado contra errores de formato)
                 status_placeholder.markdown(f'<div class="status-box">{SVG_SPINNER} Descargando clips B-roll desde Pixabay...</div>', unsafe_allow_html=True)
                 progress_bar.progress(40)
                 pixabay_url = f"https://pixabay.com/api/videos/?key={PIXABAY_KEY}&q={busqueda_broll}&orientation=vertical&per_page=3"
-                res = requests.get(pixabay_url).json()
+                
+                response = requests.get(pixabay_url)
+                try:
+                    res = response.json()
+                except Exception:
+                    progress_bar.empty()
+                    status_placeholder.empty()
+                    st.error(f"Error en la respuesta de Pixabay. Código HTTP: {response.status_code}. Comprueba que tu API Key sea correcta.")
+                    st.stop()
+                
+                hits = res.get('hits', [])
+                if not hits:
+                    progress_bar.empty()
+                    status_placeholder.empty()
+                    st.warning("No se encontraron vídeos en Pixabay para ese concepto. Prueba con otro término (ej: 'technology' o 'nature').")
+                    st.stop()
                 
                 video_files = []
-                hits = res.get('hits', [])
                 for i, video in enumerate(hits[:3]):
                     video_url = video['videos']['medium']['url']
                     v_data = requests.get(video_url).content
