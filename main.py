@@ -3,6 +3,7 @@ import os
 import requests
 import asyncio
 import edge_tts
+from urllib.parse import quote
 from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips
 from supabase import create_client
 
@@ -200,10 +201,12 @@ with tab_app:
                     await communicate.save("audio.mp3")
                 asyncio.run(make_audio())
                 
-                # 2. Pixabay API (Blindado contra errores de formato)
+                # 2. Pixabay API (Con codificación limpia de URL)
                 status_placeholder.markdown(f'<div class="status-box">{SVG_SPINNER} Descargando clips B-roll desde Pixabay...</div>', unsafe_allow_html=True)
                 progress_bar.progress(40)
-                pixabay_url = f"https://pixabay.com/api/videos/?key={PIXABAY_KEY}&q={busqueda_broll}&orientation=vertical&per_page=3"
+                
+                query_encoded = quote(busqueda_broll)
+                pixabay_url = f"https://pixabay.com/api/videos/?key={PIXABAY_KEY}&q={query_encoded}&orientation=vertical&per_page=3"
                 
                 response = requests.get(pixabay_url)
                 try:
