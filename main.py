@@ -132,6 +132,20 @@ PIXABAY_KEY = st.secrets.get("PIXABAY_KEY", st.session_state.get('PIXABAY_KEY', 
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", st.session_state.get('SUPABASE_URL', ''))
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", st.session_state.get('SUPABASE_KEY', ''))
 
+# Función automática para asegurar que el bucket "videos" existe en Supabase
+def asegurar_bucket_supabase(url, key):
+    supabase = create_client(url, key)
+    buckets = supabase.storage.list_buckets()
+    nombres_buckets = [b.name for b in buckets] if isinstance(buckets, list) else [b.get('name') for b in buckets.get('data', [])]
+    if "videos" not in nombres_buckets:
+        supabase.storage.create_bucket("videos", public=True)
+
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        asegurar_bucket_supabase(SUPABASE_URL, SUPABASE_KEY)
+    except Exception:
+        pass
+
 st.markdown(f'<div class="header-title">{SVG_ZAP} Shorts Studio</div>', unsafe_allow_html=True)
 st.markdown('<div class="header-subtitle">Pipeline automatizado para generación de YouTube Shorts.</div>', unsafe_allow_html=True)
 
